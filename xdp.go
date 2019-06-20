@@ -115,6 +115,30 @@ type Socket struct {
 	freeDescs []bool
 }
 
+// Stats contains various counters of the XDP socket, such as numbers of
+// sent/received frames.
+type Stats struct {
+	// Filled is the number of items consumed thus far by the Linux kernel
+	// from the Fill ring queue.
+	Filled uint64
+
+	// Received is the number of items consumed thus far by the user of
+	// this package from the Rx ring queue.
+	Received uint64
+
+	// Transmitted is the number of items consumed thus far by the Linux
+	// kernel from the Tx ring queue.
+	Transmitted uint64
+
+	// Completed is the number of items consumed thus far by the user of
+	// this package from the Completion ring queue.
+	Completed uint64
+
+	// KernelStats contains the in-kernel statistics of the corresponding
+	// XDP socket, such as the number of invalid descriptors that were
+	// submitted into Fill or Tx ring queues.
+	KernelStats unix.XDPStatistics
+}
 
 // DefaultSocketFlags are the flags which are passed to bind(2) system call
 // when the XDP socket is bound, possible values include unix.XDP_SHARED_UMEM,
@@ -758,4 +782,26 @@ func (xsk *Socket) getCompletedCount() int {
 	}
 
 	return int(n)
+}
+
+// GetStats returns various statistics for this XDP socket.
+func (xsk *Socket) GetStats() (Stats, error) {
+       var stats Stats
+       var size uint64
+
+       stats.Filled = uint64(*xsk.fillRing.Consumer)
+       stats.Received = uint64(*xsk.rxRing.Consumer)
+       stats.Transmitted = uint64(*xsk.txRing.Consumer)
+       stats.Completed = uint64(*xsk.completionRing.Consumer)
+
+       size = uint64(unsafe.Sizeof(stats.KernelStats))
+       rc, _, errno := unix.Syscall6(syscall.SYS_GETSOCKOPT,
+               uintptr(xsk.fd),
+               unix.SOL_XDP, unix.XDP_STATISTICS,
+               uintptr(unsafe.Pointer(&stats.KernelStats)),
+               uintptr(unsafe.Pointer(&size)), 0)
+       if rc != 0 {
+               return stats, fmt.Errorf("getsockopt XDP_STATISTICS failed with errno %d", errno)
+       }
+       return stats, nil
 }
