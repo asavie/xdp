@@ -87,7 +87,7 @@ const (
 	DescBatchSize = 16
 )
 
-type UmemRing struct {
+type umemRing struct {
 	Producer *uint32
 	Consumer *uint32
 	CachedProducer uint32
@@ -95,7 +95,7 @@ type UmemRing struct {
 	Descs []uint64
 }
 
-type RxTxRing struct {
+type rxTxRing struct {
 	Producer *uint32
 	Consumer *uint32
 	CachedProducer uint32
@@ -106,10 +106,10 @@ type RxTxRing struct {
 type Socket struct {
 	fd int
 	umem []byte
-	fillRing UmemRing
-	rxRing RxTxRing
-	txRing RxTxRing
-	completionRing UmemRing
+	fillRing umemRing
+	rxRing rxTxRing
+	txRing rxTxRing
+	completionRing umemRing
 	qidconfMap *ebpf.Map
 	xsksMap *ebpf.Map
 	program *ebpf.Program
