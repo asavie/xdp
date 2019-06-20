@@ -534,7 +534,7 @@ func (xsk *Socket) Receive(num int) []unix.XDPDesc {
 // descriptors were actually pushed onto the Tx ring queue.
 // The descriptors can be acquired either by calling the GetDescs() method or
 // by calling Receive() method.
-func (xsk *Socket) Transmit(descs []unix.XDPDesc) int {
+func (xsk *Socket) Transmit(descs []unix.XDPDesc) (numSubmitted int) {
 	numFreeSlots := xsk.GetFreeTxSlots()
 	if len(descs) > numFreeSlots {
 		descs = descs[:numFreeSlots]
@@ -551,6 +551,8 @@ func (xsk *Socket) Transmit(descs []unix.XDPDesc) int {
 
 	xsk.numTxOutstanding += len(descs)
 
+	numSubmitted = len(descs)
+
 	var rc uintptr
 	var errno syscall.Errno
 	for {
@@ -560,15 +562,21 @@ func (xsk *Socket) Transmit(descs []unix.XDPDesc) int {
 			uintptr(unix.MSG_DONTWAIT),
 			0, 0)
 		if rc != 0 {
-			if errno != unix.EINTR {
-				panic(fmt.Errorf("unix.Syscall6 SENDTO failed, rc=%d, errno=%d", rc, errno))
-			} // else retry
+                       switch errno {
+                       case unix.EINTR: fallthrough
+                       case unix.EAGAIN:
+                               // try again
+                       case unix.EBUSY: // "completed but not sent"
+                               return
+                       default:
+                               panic(fmt.Errorf("sendto failed with rc=%d and errno=%d", rc, errno))
+                       }
 		} else {
 			break
 		}
 	}
 
-	return len(descs)
+	return
 }
 
 // WaitForEvents blocks until kernel informs us that it has either received
