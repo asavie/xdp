@@ -90,16 +90,12 @@ const (
 type umemRing struct {
 	Producer *uint32
 	Consumer *uint32
-	CachedProducer uint32
-	CachedConsumer uint32
 	Descs []uint64
 }
 
 type rxTxRing struct {
 	Producer *uint32
 	Consumer *uint32
-	CachedProducer uint32
-	CachedConsumer uint32
 	Descs []unix.XDPDesc
 }
 
