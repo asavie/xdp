@@ -616,7 +616,7 @@ func (xsk *Socket) Poll(timeout int) (numReceived int, numCompleted int, err err
 		}
 
 		numReceived = xsk.numReceived()
-		if numCompleted = xsk.getCompletedCount(); numCompleted > 0 {
+		if numCompleted = xsk.numCompleted(); numCompleted > 0 {
 			xsk.complete(numCompleted)
 		}
 
@@ -782,7 +782,7 @@ func (xsk *Socket) numReceived() int {
 	return int(n)
 }
 
-func (xsk *Socket) getCompletedCount() int {
+func (xsk *Socket) numCompleted() int {
 	prod := *xsk.completionRing.Producer
 	cons := *xsk.completionRing.Consumer
 
