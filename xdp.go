@@ -509,7 +509,7 @@ func (xsk *Socket) Fill(descs []unix.XDPDesc) int {
 // Receive returns the descriptors which were filled, i.e. into which frames
 // were received into.
 func (xsk *Socket) Receive(num int) []unix.XDPDesc {
-	numAvailable := xsk.getReceivedCount()
+	numAvailable := xsk.numReceived()
 	if num > int(numAvailable) {
 		num = int(numAvailable)
 	}
@@ -615,7 +615,7 @@ func (xsk *Socket) Poll(timeout int) (numReceived int, numCompleted int, err err
 			return
 		}
 
-		numReceived = xsk.getReceivedCount()
+		numReceived = xsk.numReceived()
 		if numCompleted = xsk.getCompletedCount(); numCompleted > 0 {
 			xsk.complete(numCompleted)
 		}
@@ -770,7 +770,7 @@ func (xsk *Socket) NumFreeTxSlots() int {
 	return int(n)
 }
 
-func (xsk *Socket) getReceivedCount() int {
+func (xsk *Socket) numReceived() int {
 	prod := *xsk.rxRing.Producer
 	cons := *xsk.rxRing.Consumer
 
