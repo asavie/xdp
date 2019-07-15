@@ -535,7 +535,7 @@ func (xsk *Socket) Receive(num int) []unix.XDPDesc {
 // The descriptors can be acquired either by calling the GetDescs() method or
 // by calling Receive() method.
 func (xsk *Socket) Transmit(descs []unix.XDPDesc) (numSubmitted int) {
-	numFreeSlots := xsk.GetFreeTxSlots()
+	numFreeSlots := xsk.NumFreeTxSlots()
 	if len(descs) > numFreeSlots {
 		descs = descs[:numFreeSlots]
 	}
@@ -755,8 +755,10 @@ func (xsk *Socket) NumFreeFillSlots() int {
 	return int(n)
 }
 
-// GetFreeTxSlots returns how many free slots are available 
-func (xsk *Socket) GetFreeTxSlots() int {
+// NumFreeTxSlots returns how many free slots are available on the Tx ring
+// queue, i.e. the queue to which we produce descriptors which should be
+// transmitted by the kernel to the wire.
+func (xsk *Socket) NumFreeTxSlots() int {
 	prod := *xsk.txRing.Producer
 	cons := *xsk.txRing.Consumer
 

@@ -122,7 +122,7 @@ func main() {
 	}()
 
 	for {
-		descs := xsk.GetDescs(xsk.GetFreeTxSlots())
+		descs := xsk.GetDescs(xsk.NumFreeTxSlots())
 		for i, _ := range descs {
 			descs[i].Len = uint32(frameLen)
 		}
