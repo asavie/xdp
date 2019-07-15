@@ -792,8 +792,8 @@ func (xsk *Socket) getCompletedCount() int {
 	return int(n)
 }
 
-// GetStats returns various statistics for this XDP socket.
-func (xsk *Socket) GetStats() (Stats, error) {
+// Stats returns various statistics for this XDP socket.
+func (xsk *Socket) Stats() (Stats, error) {
        var stats Stats
        var size uint64
 

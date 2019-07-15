@@ -111,7 +111,7 @@ func main() {
 		var numPkts uint64
 		for i := uint64(0); ; i++ {
 			time.Sleep(time.Duration(1)*time.Second)
-			cur, err = xsk.GetStats()
+			cur, err = xsk.Stats()
 			if err != nil {
 				panic(err)
 			}
