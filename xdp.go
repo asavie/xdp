@@ -42,7 +42,7 @@ transmits them back out the same network link:
 		}
 	
 		for {
-			xsk.Fill(xsk.GetDescs(xsk.GetFreeFillSlots()))
+			xsk.Fill(xsk.GetDescs(xsk.NumFreeFillSlots()))
 			numRx, _, err := xsk.Poll(-1)
 			if err != nil {
 				panic(err)
@@ -487,7 +487,7 @@ func NewSocket(Ifindex int, QueueID int) (xsk *Socket, err error) {
 // The descriptors can be acquired either by calling the GetDescs() method or
 // by calling Receive() method.
 func (xsk *Socket) Fill(descs []unix.XDPDesc) int {
-	numFreeSlots := xsk.GetFreeFillSlots()
+	numFreeSlots := xsk.NumFreeFillSlots()
 	if numFreeSlots < len(descs) {
 		descs = descs[:numFreeSlots]
 	}
@@ -740,10 +740,10 @@ func (xsk *Socket) complete(n int) {
 	xsk.numTxOutstanding -= n
 }
 
-// GetFreeFillSlots returns how many free slots are available on the Fill ring
+// NumFreeFillSlots returns how many free slots are available on the Fill ring
 // queue, i.e. the queue to which we produce descriptors which should be filled
 // by the kernel with incoming frames.
-func (xsk *Socket) GetFreeFillSlots() int {
+func (xsk *Socket) NumFreeFillSlots() int {
 	prod := *xsk.fillRing.Producer
 	cons := *xsk.fillRing.Consumer
 

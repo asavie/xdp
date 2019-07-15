@@ -61,7 +61,7 @@ func main() {
 
 	for {
 		// If there are any free slots on the Fill queue...
-		if n := xsk.GetFreeFillSlots(); n > 0 {
+		if n := xsk.NumFreeFillSlots(); n > 0 {
 			// ...then fetch up to that number of not-in-use
 			// descriptors and push them onto the Fill ring queue
 			// for the kernel to fill them with the received
