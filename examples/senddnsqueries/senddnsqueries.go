@@ -128,7 +128,7 @@ func main() {
 		}
 		xsk.Transmit(descs)
 
-		_, _, err = xsk.WaitForEvents(1)
+		_, _, err = xsk.Poll(1)
 		if err != nil {
 			panic(err)
 		}

@@ -73,7 +73,7 @@ func main() {
 		// produced one or more descriptors filled with a received
 		// frame onto the Rx ring queue.
 		log.Printf("waiting for frame(s) to be received...")
-		numRx, _, err := xsk.WaitForEvents(-1)
+		numRx, _, err := xsk.Poll(-1)
 		if err != nil {
 			fmt.Printf("error: %v\n", err)
 			return

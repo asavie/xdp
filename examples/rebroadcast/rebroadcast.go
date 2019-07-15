@@ -80,7 +80,7 @@ func main() {
 		// Both events mean that some descriptors are not-in-use any
 		// more and can be recycled.
 		fmt.Printf("waiting for events...\n")
-		numRx, numCompl, err := xsk.WaitForEvents(-1)
+		numRx, numCompl, err := xsk.Poll(-1)
 		if err != nil {
 			fmt.Printf("error: %v\n", err)
 			return

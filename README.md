@@ -31,7 +31,7 @@ func main() {
 
 	for {
 		xsk.Fill(xsk.GetDescs(xsk.GetFreeFillSlots()))
-		numRx, _, err := xsk.WaitForEvents(-1)
+		numRx, _, err := xsk.Poll(-1)
 		if err != nil {
 			panic(err)
 		}

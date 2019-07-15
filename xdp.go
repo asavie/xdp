@@ -43,7 +43,7 @@ transmits them back out the same network link:
 	
 		for {
 			xsk.Fill(xsk.GetDescs(xsk.GetFreeFillSlots()))
-			numRx, _, err := xsk.WaitForEvents(-1)
+			numRx, _, err := xsk.Poll(-1)
 			if err != nil {
 				panic(err)
 			}
@@ -579,12 +579,12 @@ func (xsk *Socket) Transmit(descs []unix.XDPDesc) (numSubmitted int) {
 	return
 }
 
-// WaitForEvents blocks until kernel informs us that it has either received
+// Poll blocks until kernel informs us that it has either received
 // or completed (i.e. actually sent) some frames that were previously submitted
 // using Fill() or Transmit() methods.
 // The numReceived return value can be used as the argument for subsequent 
 // Receive() method call.
-func (xsk *Socket) WaitForEvents(timeout int) (numReceived int, numCompleted int, err error) {
+func (xsk *Socket) Poll(timeout int) (numReceived int, numCompleted int, err error) {
 	var events int16
 	var n int
 	var pfds [1]unix.PollFd
