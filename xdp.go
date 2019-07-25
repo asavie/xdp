@@ -110,8 +110,8 @@ type Socket struct {
 	xsksMap *ebpf.Map
 	program *ebpf.Program
 	ifindex int
-	numTxOutstanding int
-	numFillOutstanding int
+	numTransmitted int
+	numFilled int
 	freeDescs []bool
 }
 
@@ -501,7 +501,7 @@ func (xsk *Socket) Fill(descs []unix.XDPDesc) int {
 	fencer.SFence()
 	*xsk.fillRing.Producer = prod
 
-	xsk.numFillOutstanding += len(descs)
+	xsk.numFilled += len(descs)
 
 	return len(descs)
 }
@@ -509,7 +509,7 @@ func (xsk *Socket) Fill(descs []unix.XDPDesc) int {
 // Receive returns the descriptors which were filled, i.e. into which frames
 // were received into.
 func (xsk *Socket) Receive(num int) []unix.XDPDesc {
-	numAvailable := xsk.numReceived()
+	numAvailable := xsk.NumReceived()
 	if num > int(numAvailable) {
 		num = int(numAvailable)
 	}
@@ -525,7 +525,7 @@ func (xsk *Socket) Receive(num int) []unix.XDPDesc {
 	fencer.MFence()
 	*xsk.rxRing.Consumer = cons
 
-	xsk.numFillOutstanding -= len(descs)
+	xsk.numFilled -= len(descs)
 
 	return descs
 }
@@ -549,7 +549,7 @@ func (xsk *Socket) Transmit(descs []unix.XDPDesc) (numSubmitted int) {
 	fencer.SFence()
 	*xsk.txRing.Producer = prod
 
-	xsk.numTxOutstanding += len(descs)
+	xsk.numTransmitted += len(descs)
 
 	numSubmitted = len(descs)
 
@@ -579,6 +579,12 @@ func (xsk *Socket) Transmit(descs []unix.XDPDesc) (numSubmitted int) {
 	return
 }
 
+// FD returns the file descriptor associated with this xdp.Socket which can be
+// used e.g. to do polling.
+func (xsk *Socket) FD() int {
+	return xsk.fd
+}
+
 // Poll blocks until kernel informs us that it has either received
 // or completed (i.e. actually sent) some frames that were previously submitted
 // using Fill() or Transmit() methods.
@@ -591,10 +597,10 @@ func (xsk *Socket) Poll(timeout int) (numReceived int, numCompleted int, err err
 	
 	for {
 		events = 0
-		if xsk.numFillOutstanding > 0 {
+		if xsk.numFilled > 0 {
 			events |= unix.POLLIN
 		}
-		if xsk.numTxOutstanding > 0 {
+		if xsk.numTransmitted > 0 {
 			events |= unix.POLLOUT
 		}
 		if events == 0 {
@@ -615,9 +621,9 @@ func (xsk *Socket) Poll(timeout int) (numReceived int, numCompleted int, err err
 			return
 		}
 
-		numReceived = xsk.numReceived()
-		if numCompleted = xsk.numCompleted(); numCompleted > 0 {
-			xsk.complete(numCompleted)
+		numReceived = xsk.NumReceived()
+		if numCompleted = xsk.NumCompleted(); numCompleted > 0 {
+			xsk.Complete(numCompleted)
 		}
 
 		if numReceived > 0 || numCompleted > 0 {
@@ -726,7 +732,12 @@ func (xsk *Socket) Close() error {
 	return nil
 }
 
-func (xsk *Socket) complete(n int) {
+// Complete consumes up to n descriptors from the Completion ring queue to
+// which the kernel produces when it has actually transmitted a descriptor it
+// got from Tx ring queue.
+// You should use this method if you are doing polling on the xdp.Socket file
+// descriptor yourself, rather than using the Poll() method.
+func (xsk *Socket) Complete(n int) {
 	cons := *xsk.completionRing.Consumer
 	fencer.LFence()
 	for i := 0; i < n; i++ {
@@ -737,7 +748,7 @@ func (xsk *Socket) complete(n int) {
 	fencer.MFence()
 	*xsk.completionRing.Consumer = cons
 
-	xsk.numTxOutstanding -= n
+	xsk.numTransmitted -= n
 }
 
 // NumFreeFillSlots returns how many free slots are available on the Fill ring
@@ -770,7 +781,9 @@ func (xsk *Socket) NumFreeTxSlots() int {
 	return int(n)
 }
 
-func (xsk *Socket) numReceived() int {
+// NumReceived returns how many descriptors are there on the Rx ring queue
+// which were produced by the kernel and which we have not yet consumed.
+func (xsk *Socket) NumReceived() int {
 	prod := *xsk.rxRing.Producer
 	cons := *xsk.rxRing.Consumer
 
@@ -782,7 +795,9 @@ func (xsk *Socket) numReceived() int {
 	return int(n)
 }
 
-func (xsk *Socket) numCompleted() int {
+// NumCompleted returns how many descriptors are there on the Completion ring
+// queue which were produced by the kernel and which we have not yet consumed.
+func (xsk *Socket) NumCompleted() int {
 	prod := *xsk.completionRing.Producer
 	cons := *xsk.completionRing.Consumer
 
@@ -792,6 +807,28 @@ func (xsk *Socket) numCompleted() int {
 	}
 
 	return int(n)
+}
+
+// NumFilled returns how many descriptors are there on the Fill ring
+// queue which have not yet been consumed by the kernel.
+// This method is useful if you're polling the xdp.Socket file descriptor
+// yourself, rather than using the Poll() method - if it returns a number
+// greater than zero it means you should set the unix.POLLIN flag.
+func (xsk *Socket) NumFilled() int {
+	return xsk.numFilled
+}
+
+// NumTransmitted returns how many descriptors are there on the Tx ring queue
+// which have not yet been consumed by the kernel.
+// Note that even after the descriptors are consumed by the kernel from the Tx
+// ring queue, it doesn't mean that they have actually been sent out on the
+// wire, that can be assumed only after the descriptors have been produced by
+// the kernel to the Completion ring queue.
+// This method is useful if you're polling the xdp.Socket file descriptor
+// yourself, rather than using the Poll() method - if it returns a number
+// greater than zero it means you should set the unix.POLLOUT flag.
+func (xsk *Socket) NumTransmitted() int {
+	return xsk.numTransmitted
 }
 
 // Stats returns various statistics for this XDP socket.
