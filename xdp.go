@@ -11,11 +11,24 @@ An XDP socket allows to get packets from a network interface driver into
 a userspace process very fast, bypassing the Linux kernel's network
 stack, see https://lwn.net/Articles/750845/ for more information.
 
-Note that if your network link device supports multiple queues - you might
+NOTE:
+
+* If your network link device supports multiple queues - you might
 not see all of the incoming traffic because it might be e.g. load-balanced
-between multiple queues. You can use the `ethtool` command to control the 
+between multiple queues. You can use the `ethtool -L` command to control the 
 load-balancing behaviour or even make it so that all of the incoming traffic
 is put on a single queue.
+
+* On recent versions of Linux kernel, the eBPF map memory counts towards the
+"locked memory" user limit, so most likely you'll have to increase it. On
+Fedora Linux, this can be done by running `ulimit -l <new-limit>` command, or
+to make it permanent, by creating a file at
+`/etc/security/limits.d/50-lockedmem.conf` with e.g. the following contents
+(1MiB should be enough for this package):
+	* - lockedmem 1048576
+logging out and logging back in.
+When you hit this limit, you'll get an error that looks like this:
+	error: failed to create an XDP socket: ebpf.NewMap qidconf_map failed: map create: operation not permitted
 
 Here is a minimal example of a program which receives network frames,
 modifies their destination MAC address in-place to broadcast address and
