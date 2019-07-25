@@ -73,7 +73,7 @@ import (
 
 	"github.com/newtools/ebpf"
 	"github.com/newtools/ebpf/asm"
-	"github.com/textnode/fencer"
+	//"github.com/textnode/fencer"
 	"github.com/vishvananda/netlink"
 )
 
@@ -498,7 +498,7 @@ func (xsk *Socket) Fill(descs []unix.XDPDesc) int {
 		prod++
 		xsk.freeDescs[desc.Addr / FrameSize] = false
 	}
-	fencer.SFence()
+	//fencer.SFence()
 	*xsk.fillRing.Producer = prod
 
 	xsk.numFilled += len(descs)
@@ -516,13 +516,13 @@ func (xsk *Socket) Receive(num int) []unix.XDPDesc {
 
 	descs := make([]unix.XDPDesc, num)
 	cons := *xsk.rxRing.Consumer
-	fencer.LFence()
+	//fencer.LFence()
 	for i := 0; i < num; i++ {
 		descs[i] = xsk.rxRing.Descs[cons & (RxRingNumDescs-1)]
 		cons++
 		xsk.freeDescs[descs[i].Addr / FrameSize] = true
 	}
-	fencer.MFence()
+	//fencer.MFence()
 	*xsk.rxRing.Consumer = cons
 
 	xsk.numFilled -= len(descs)
@@ -546,7 +546,7 @@ func (xsk *Socket) Transmit(descs []unix.XDPDesc) (numSubmitted int) {
 		prod++
 		xsk.freeDescs[desc.Addr / FrameSize] = false
 	}
-	fencer.SFence()
+	//fencer.SFence()
 	*xsk.txRing.Producer = prod
 
 	xsk.numTransmitted += len(descs)
@@ -739,13 +739,13 @@ func (xsk *Socket) Close() error {
 // descriptor yourself, rather than using the Poll() method.
 func (xsk *Socket) Complete(n int) {
 	cons := *xsk.completionRing.Consumer
-	fencer.LFence()
+	//fencer.LFence()
 	for i := 0; i < n; i++ {
 		addr := xsk.completionRing.Descs[cons & (CompletionRingNumDescs-1)]
 		cons++
 		xsk.freeDescs[addr / FrameSize] = true
 	}
-	fencer.MFence()
+	//fencer.MFence()
 	*xsk.completionRing.Consumer = cons
 
 	xsk.numTransmitted -= n
