@@ -51,6 +51,17 @@ func main() {
 
 ## Performance
 
+### examples/sendudp
+
+With the default UDP payload size of 1400 bytes, running on Linux kernel
+5.1.20, on a
+[tg3](https://github.com/torvalds/linux/blob/master/drivers/net/ethernet/broadcom/tg3.c)
+(so no native XDP support) gigabit NIC,
+[sendudp.go](https://github.com/asavie/xdp/blob/master/examples/sendudp/sendudp.go)
+does around 980 Mb/s, so practically line rate.
+
+### examples/senddnsqueries
+
 TL;DR: in the same environment, sending a pre-generated DNS query using an
 ordinary UDP socket yields around 30 MiB/s whereas sending it using the
 [senddnsqueries.go](https://github.com/asavie/xdp/blob/master/examples/senddnsqueries/senddnsqueries.go)
