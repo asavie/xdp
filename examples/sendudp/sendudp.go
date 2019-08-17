@@ -25,6 +25,8 @@ var SrcMAC string
 var DstMAC string
 var SrcIP string
 var DstIP string
+var SrcPort uint
+var DstPort uint
 var PayloadSize uint
 
 func main() {
@@ -34,6 +36,8 @@ func main() {
 	flag.StringVar(&DstMAC, "dstmac", "ffffffffffff", "Destination MAC address to use in sent frames.")
 	flag.StringVar(&SrcIP, "srcip", "192.168.111.10", "Source IP address to use in sent frames.")
 	flag.StringVar(&DstIP, "dstip", "192.168.111.1", "Destination IP address to use in sent frames.")
+	flag.UintVar(&SrcPort, "srcport", 1234, "Source UDP port.")
+	flag.UintVar(&DstPort, "dstport", 1234, "Destination UDP port.")
 	flag.UintVar(&PayloadSize, "payloadsize", 1400, "Size of the UDP payload.")
 	flag.Parse()
 
@@ -69,8 +73,8 @@ func main() {
 		DstIP: net.ParseIP(DstIP).To4(),
 	}
 	udp := &layers.UDP{
-		SrcPort: 1234,
-		DstPort: 1234,
+		SrcPort: layers.UDPPort(SrcPort),
+		DstPort: layers.UDPPort(DstPort),
 	}
 	udp.SetNetworkLayerForChecksum(ip)
 	payload := make([]byte, PayloadSize)
