@@ -118,7 +118,7 @@ func main() {
 				panic(err)
 			}
 			numPkts = cur.Completed - prev.Completed
-			fmt.Printf("%d packets/s (%d bytes/s)\n", numPkts, numPkts * uint64(frameLen))
+			fmt.Printf("%d packets/s (%d Mb/s)\n", numPkts, (numPkts * uint64(frameLen) * 8)/(1000*1000))
 			prev = cur
 		}
 	}()
