@@ -353,7 +353,7 @@ func NewSocket(Ifindex int, QueueID int) (xsk *Socket, err error) {
 		})
 	if err != nil {
 		xsk.Close()
-		return nil, fmt.Errorf("ebpf.NewMap qidconf_map failed: %v", err)
+		return nil, fmt.Errorf("ebpf.NewMap qidconf_map failed (try increasing RLIMIT_MEMLOCK): %v", err)
 	}
 
 	xsk.xsksMap, err = ebpf.NewMap(&ebpf.MapSpec{
@@ -367,7 +367,7 @@ func NewSocket(Ifindex int, QueueID int) (xsk *Socket, err error) {
 		})
 	if err != nil {
 		xsk.Close()
-		return nil, fmt.Errorf("ebpf.NewMap xsks_map failed: %v", err)
+		return nil, fmt.Errorf("ebpf.NewMap xsks_map failed (try increasing RLIMIT_MEMLOCK): %v", err)
 	}
 
 /*
