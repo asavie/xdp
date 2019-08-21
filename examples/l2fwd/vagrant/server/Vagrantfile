@@ -1,0 +1,25 @@
+$provision_script = <<-SCRIPT
+echo Installing iperf...
+sudo dnf -y install iperf tcpdump
+echo Setting up the experiment...
+sudo ./setup_experiment.sh
+echo Done.
+echo 'Run `iperf -s` to start iperf server.'
+SCRIPT
+
+Vagrant.configure("2") do |config|
+	config.vm.box = "fedora/30-cloud-base"
+	config.vm.hostname = "server"
+	config.vm.provider "virtualbox" do |v|
+		v.name = "Server"
+		v.memory = 1024
+		#v.cpus = 2
+	end
+	config.vm.network "private_network",
+		virtualbox__intnet: "server_intnet",
+		mac: "0800270c57be",
+		ip: "192.168.200.10",
+		netmask: 24
+	config.vm.provision "file", source: "setup_experiment.sh", destination: "setup_experiment.sh"
+	config.vm.provision "shell", inline: $provision_script
+end

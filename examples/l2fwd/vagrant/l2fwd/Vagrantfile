@@ -1,0 +1,36 @@
+$provision_script = <<-SCRIPT
+echo Installing packages...
+sudo dnf -y install golang ethtool tcpdump perf vim
+echo Fetching and building l2fwd...
+go get github.com/asavie/xdp/examples/l2fwd
+echo Increasing maximum locked memory size...
+sudo install 50-memlock.conf /etc/security/limits.d/50-memlock.conf
+echo Setting up the experiment...
+sudo ./setup_experiment.sh
+echo Done.
+echo 'Run `sudo ~/go/bin/l2fwd -verbose -inlink eth1 -outlink eth2 -inlinkdst 08:00:27:0c:57:be -outlinkdst 08:00:27:bd:aa:9b` to start l2fwd.'
+SCRIPT
+
+Vagrant.configure("2") do |config|
+	config.vm.box = "fedora/30-cloud-base"
+	config.vm.hostname = "l2fwd"
+	config.vm.provider "virtualbox" do |v|
+		v.name = "L2fwd"
+		v.memory = 1024
+		#v.cpus = 2
+	end
+	config.vm.network "private_network",
+		virtualbox__intnet: "client_intnet",
+		mac: "080027fa8824",
+		ip: "192.168.100.1",
+		netmask: 24
+	config.vm.network "private_network",
+		virtualbox__intnet: "server_intnet",
+		mac: "080027c59c11",
+		ip: "192.168.200.1",
+		netmask: 24
+	config.vm.provision "file", source: "50-memlock.conf", destination: "50-memlock.conf"
+	config.vm.provision "file", source: "setup_experiment.sh", destination: "setup_experiment.sh"
+	config.vm.provision "shell", inline: $provision_script
+end
+
