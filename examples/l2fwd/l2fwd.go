@@ -21,10 +21,10 @@ import (
 func main() {
 	var inLinkName string
 	var inLinkDstStr string
-	var inLinkQueueId int
+	var inLinkQueueID int
 	var outLinkName string
 	var outLinkDstStr string
-	var outLinkQueueId int
+	var outLinkQueueID int
 	var verbose bool
 
 	flag.Usage = func() {
@@ -32,10 +32,10 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.StringVar(&inLinkName, "inlink", "", "Input network link name.")
-	flag.IntVar(&inLinkQueueId, "inlinkqueue", 0, "The queue ID to attach to on input link.")
+	flag.IntVar(&inLinkQueueID, "inlinkqueue", 0, "The queue ID to attach to on input link.")
 	flag.StringVar(&inLinkDstStr, "inlinkdst", "ff:ff:ff:ff:ff:ff", "Destination MAC address to forward frames to from 'in' interface.")
 	flag.StringVar(&outLinkName, "outlink", "", "Output network link name.")
-	flag.IntVar(&outLinkQueueId, "outlinkqueue", 0, "The queue ID to attach to on output link.")
+	flag.IntVar(&outLinkQueueID, "outlinkqueue", 0, "The queue ID to attach to on output link.")
 	flag.StringVar(&outLinkDstStr, "outlinkdst", "ff:ff:ff:ff:ff:ff", "Destination MAC address to forward frames to from 'out' interface.")
 	flag.BoolVar(&verbose, "verbose", false, "Output forwarding statistics.")
 	flag.Parse()
@@ -67,18 +67,18 @@ func main() {
 		log.Fatalf("failed to fetch info about link %s: %v", outLinkName, err)
 	}
 
-	forwardL2(verbose, inLink, inLinkQueueId, inLinkDst, outLink, outLinkQueueId, outLinkDst)
+	forwardL2(verbose, inLink, inLinkQueueID, inLinkDst, outLink, outLinkQueueID, outLinkDst)
 }
 
-func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueId int, inLinkDst net.HardwareAddr, outLink netlink.Link, outLinkQueueId int, outLinkDst net.HardwareAddr) {
+func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst net.HardwareAddr, outLink netlink.Link, outLinkQueueID int, outLinkDst net.HardwareAddr) {
 	log.Printf("opening XDP socket for %s...", inLink.Attrs().Name)
-	inXsk, err := xdp.NewSocket(inLink.Attrs().Index, inLinkQueueId)
+	inXsk, err := xdp.NewSocket(inLink.Attrs().Index, inLinkQueueID)
 	if err != nil {
 		log.Fatalf("failed to open XDP socket for link %s: %v", inLink.Attrs().Name, err)
 	}
 
 	log.Printf("opening XDP socket for %s...", outLink.Attrs().Name)
-	outXsk, err := xdp.NewSocket(outLink.Attrs().Index, outLinkQueueId)
+	outXsk, err := xdp.NewSocket(outLink.Attrs().Index, outLinkQueueID)
 	if err != nil {
 		log.Fatalf("failed to open XDP socket for link %s: %v", outLink.Attrs().Name, err)
 	}
