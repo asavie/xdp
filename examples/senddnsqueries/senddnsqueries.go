@@ -13,19 +13,22 @@ import (
 	"time"
 
 	"github.com/asavie/xdp"
-	"github.com/vishvananda/netlink"
-	"github.com/miekg/dns"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/miekg/dns"
+	"github.com/vishvananda/netlink"
 )
 
-var NIC string
-var QueueID int
-var SrcMAC string
-var DstMAC string
-var SrcIP string
-var DstIP string
-var DomainName string
+// ...
+var (
+	NIC        string
+	QueueID    int
+	SrcMAC     string
+	DstMAC     string
+	SrcIP      string
+	DstIP      string
+	DomainName string
+)
 
 func main() {
 	flag.StringVar(&NIC, "interface", "enp3s0", "Network interface to attach to.")
@@ -55,18 +58,18 @@ func main() {
 	dstMAC, _ := hex.DecodeString(DstMAC)
 
 	eth := &layers.Ethernet{
-		SrcMAC: net.HardwareAddr(srcMAC),
-		DstMAC: net.HardwareAddr(dstMAC),
+		SrcMAC:       net.HardwareAddr(srcMAC),
+		DstMAC:       net.HardwareAddr(dstMAC),
 		EthernetType: layers.EthernetTypeIPv4,
 	}
 	ip := &layers.IPv4{
-		Version: 4,
-		IHL: 5,
-		TTL: 64,
-		Id: 0,
+		Version:  4,
+		IHL:      5,
+		TTL:      64,
+		Id:       0,
 		Protocol: layers.IPProtocolUDP,
-		SrcIP: net.ParseIP(SrcIP).To4(),
-		DstIP: net.ParseIP(DstIP).To4(),
+		SrcIP:    net.ParseIP(SrcIP).To4(),
+		DstIP:    net.ParseIP(DstIP).To4(),
 	}
 	udp := &layers.UDP{
 		SrcPort: 1234,
@@ -82,7 +85,7 @@ func main() {
 
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{
-		FixLengths: true,
+		FixLengths:       true,
 		ComputeChecksums: true,
 	}
 	err = gopacket.SerializeLayers(buf, opts, eth, ip, udp, gopacket.Payload(payload))
@@ -94,7 +97,7 @@ func main() {
 	// Fill all the frames in UMEM with the pre-generated DNS query frame.
 
 	descs := xsk.GetDescs(math.MaxInt32)
-	for i, _ := range descs {
+	for i := range descs {
 		frameLen = copy(xsk.GetFrame(descs[i]), buf.Bytes())
 	}
 
@@ -104,26 +107,26 @@ func main() {
 
 	fmt.Printf("sending DNS queries from %v (%v) to %v (%v) for domain name %s...\n", ip.SrcIP, eth.SrcMAC, ip.DstIP, eth.DstMAC, DomainName)
 
-	go func(){
+	go func() {
 		var err error
 		var prev xdp.Stats
 		var cur xdp.Stats
 		var numPkts uint64
 		for i := uint64(0); ; i++ {
-			time.Sleep(time.Duration(1)*time.Second)
+			time.Sleep(time.Duration(1) * time.Second)
 			cur, err = xsk.Stats()
 			if err != nil {
 				panic(err)
 			}
 			numPkts = cur.Completed - prev.Completed
-			fmt.Printf("%d packets/s (%d bytes/s)\n", numPkts, numPkts * uint64(frameLen))
+			fmt.Printf("%d packets/s (%d bytes/s)\n", numPkts, numPkts*uint64(frameLen))
 			prev = cur
 		}
 	}()
 
 	for {
 		descs := xsk.GetDescs(xsk.NumFreeTxSlots())
-		for i, _ := range descs {
+		for i := range descs {
 			descs[i].Len = uint32(frameLen)
 		}
 		xsk.Transmit(descs)

@@ -1,8 +1,8 @@
-// Copyright 2019 Asavie Technologies Ltd. All rights reserved.                 
-//                                                                              
-// Use of this source code is governed by a BSD-style license                   
-// that can be found in the LICENSE file in the root of the source              
-// tree.                                                                        
+// Copyright 2019 Asavie Technologies Ltd. All rights reserved.
+//
+// Use of this source code is governed by a BSD-style license
+// that can be found in the LICENSE file in the root of the source
+// tree.
 
 /*
 dumpframes demostrates how to receive frames from a network link using
