@@ -11,6 +11,10 @@ back out the same network link:
 package main
 
 import (
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/asavie/xdp"
 	"github.com/vishvananda/netlink"
 )
@@ -25,9 +29,19 @@ func main() {
 	}
 
 	xsk, err := xdp.NewSocket(link.Attrs().Index, QueueID)
+	defer xsk.Close()
 	if err != nil {
 		panic(err)
 	}
+	
+	// removing the XDP program on interrupt
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		xsk.Close()
+		os.Exit(1)
+	}()
 
 	for {
 		xsk.Fill(xsk.GetDescs(xsk.NumFreeFillSlots()))
