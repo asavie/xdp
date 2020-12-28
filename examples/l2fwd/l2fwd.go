@@ -80,6 +80,7 @@ func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst n
 	if err := inProg.Attach(inLink.Attrs().Index); err != nil {
 		log.Fatalf("failed to attach xdp program to interface: %v\n", err)
 	}
+	defer inProg.Detach(inLink.Attrs().Index)
 	log.Printf("opening XDP socket for %s...", inLink.Attrs().Name)
 	inXsk, err := xdp.NewSocket(inLink.Attrs().Index, inLinkQueueID)
 	if err != nil {
