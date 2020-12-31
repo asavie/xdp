@@ -49,8 +49,20 @@ transmits them back out the same network link:
 			panic(err)
 		}
 
+		program, err := xdp.NewProgram(QueueID + 1)
+		if err != nil {
+			panic(err)
+		}
+		if err := program.Attach(link.Attrs().Index); err != nil {
+			panic(err)
+		}
+
 		xsk, err := xdp.NewSocket(link.Attrs().Index, QueueID)
 		if err != nil {
+			panic(err)
+		}
+
+		if err := program.Register(QueueID, xsk.FD()); err != nil {
 			panic(err)
 		}
 
