@@ -87,7 +87,7 @@ func (p *Program) Close() error {
 // NewProgram returns a translation of the default eBPF XDP program found in the
 // xsk_load_xdp_prog() function in <linux>/tools/lib/bpf/xsk.c:
 // https://github.com/torvalds/linux/blob/master/tools/lib/bpf/xsk.c#L259
-func NewProgram(maxSocketEntries, maxQueueEntries int) (*Program, error) {
+func NewProgram(maxQueueEntries int) (*Program, error) {
 	qidconfMap, err := ebpf.NewMap(&ebpf.MapSpec{
 		Name:       "qidconf_map",
 		Type:       ebpf.Array,
@@ -106,7 +106,7 @@ func NewProgram(maxSocketEntries, maxQueueEntries int) (*Program, error) {
 		Type:       ebpf.XSKMap,
 		KeySize:    uint32(unsafe.Sizeof(int32(0))),
 		ValueSize:  uint32(unsafe.Sizeof(int32(0))),
-		MaxEntries: uint32(maxSocketEntries),
+		MaxEntries: uint32(maxQueueEntries),
 		Flags:      0,
 		InnerMap:   nil,
 	})

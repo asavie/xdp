@@ -52,7 +52,7 @@ func main() {
 	}
 
 	// Create a new XDP eBPF program and attach it to our chosen network link.
-	program, err := xdp.NewProgram(1, queueID+1)
+	program, err := xdp.NewProgram(queueID + 1)
 	if err != nil {
 		fmt.Printf("error: failed to create xdp program: %v\n", err)
 		return

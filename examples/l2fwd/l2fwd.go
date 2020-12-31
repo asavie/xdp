@@ -73,7 +73,7 @@ func main() {
 
 func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst net.HardwareAddr, outLink netlink.Link, outLinkQueueID int, outLinkDst net.HardwareAddr) {
 	log.Printf("attaching XDP program for %s...", inLink.Attrs().Name)
-	inProg, err := xdp.NewProgram(1, inLinkQueueID+1)
+	inProg, err := xdp.NewProgram(inLinkQueueID + 1)
 	if err != nil {
 		log.Fatalf("failed to create xdp program: %v\n", err)
 	}
