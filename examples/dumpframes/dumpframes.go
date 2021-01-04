@@ -51,6 +51,19 @@ func main() {
 		return
 	}
 
+	// Create a new XDP eBPF program and attach it to our chosen network link.
+	program, err := xdp.NewProgram(queueID + 1)
+	if err != nil {
+		fmt.Printf("error: failed to create xdp program: %v\n", err)
+		return
+	}
+	defer program.Close()
+	if err := program.Attach(Ifindex); err != nil {
+		fmt.Printf("error: failed to attach xdp program to interface: %v\n", err)
+		return
+	}
+	defer program.Detach(Ifindex)
+
 	// Create and initialize an XDP socket attached to our chosen network
 	// link.
 	xsk, err := xdp.NewSocket(Ifindex, queueID)
@@ -58,6 +71,13 @@ func main() {
 		fmt.Printf("error: failed to create an XDP socket: %v\n", err)
 		return
 	}
+
+	// Register our XDP socket file descriptor with the eBPF program so it can be redirected packets
+	if err := program.Register(queueID, xsk.FD()); err != nil {
+		fmt.Printf("error: failed to register socket in BPF map: %v\n", err)
+		return
+	}
+	defer program.Unregister(queueID)
 
 	for {
 		// If there are any free slots on the Fill queue...

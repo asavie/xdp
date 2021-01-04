@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"syscall"
 	"time"
 
 	"github.com/asavie/xdp"
@@ -71,12 +72,28 @@ func main() {
 }
 
 func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst net.HardwareAddr, outLink netlink.Link, outLinkQueueID int, outLinkDst net.HardwareAddr) {
+	log.Printf("attaching XDP program for %s...", inLink.Attrs().Name)
+	inProg, err := xdp.NewProgram(inLinkQueueID + 1)
+	if err != nil {
+		log.Fatalf("failed to create xdp program: %v\n", err)
+	}
+	if err := inProg.Attach(inLink.Attrs().Index); err != nil {
+		log.Fatalf("failed to attach xdp program to interface: %v\n", err)
+	}
+	defer inProg.Detach(inLink.Attrs().Index)
 	log.Printf("opening XDP socket for %s...", inLink.Attrs().Name)
 	inXsk, err := xdp.NewSocket(inLink.Attrs().Index, inLinkQueueID)
 	if err != nil {
 		log.Fatalf("failed to open XDP socket for link %s: %v", inLink.Attrs().Name, err)
 	}
+	log.Printf("registering XDP socket for %s...", inLink.Attrs().Name)
+	if err := inProg.Register(inLinkQueueID, inXsk.FD()); err != nil {
+		fmt.Printf("error: failed to register socket in BPF map: %v\n", err)
+		return
+	}
+	defer inProg.Unregister(inLinkQueueID)
 
+	// Note: The XDP socket used for transmitting data does not need an EBPF program.
 	log.Printf("opening XDP socket for %s...", outLink.Attrs().Name)
 	outXsk, err := xdp.NewSocket(outLink.Attrs().Index, outLinkQueueID)
 	if err != nil {
@@ -124,7 +141,10 @@ func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst n
 		fds[0].Revents = 0
 		fds[1].Revents = 0
 		_, err := unix.Poll(fds[:], -1)
-		if err != nil {
+		if err == syscall.EINTR {
+			// EINTR is a non-fatal error that may occur due to ongoing syscalls that interrupt our poll
+			continue
+		} else if err != nil {
 			fmt.Fprintf(os.Stderr, "poll failed: %v\n", err)
 			os.Exit(1)
 		}
