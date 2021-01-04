@@ -33,15 +33,20 @@ When you hit this limit, you'll get an error that looks like this:
 Here is a minimal example of a program which receives network frames,
 modifies their destination MAC address in-place to broadcast address and
 transmits them back out the same network link:
+
 	package main
 
 	import (
+		"os"
+		"os/signal"
+		"syscall"
+
 		"github.com/asavie/xdp"
 		"github.com/vishvananda/netlink"
 	)
 
 	func main() {
-		const LinkName = "enp3s0"
+		const LinkName = "enp6s0"
 		const QueueID = 0
 
 		link, err := netlink.LinkByName(LinkName)
@@ -65,6 +70,15 @@ transmits them back out the same network link:
 		if err := program.Register(QueueID, xsk.FD()); err != nil {
 			panic(err)
 		}
+
+		// Remove the XDP BPF program on interrupt.
+		c := make(chan os.Signal)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			<-c
+			program.Detach(link.Attrs().Index)
+			os.Exit(1)
+		}()
 
 		for {
 			xsk.Fill(xsk.GetDescs(xsk.NumFreeFillSlots()))
