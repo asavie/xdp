@@ -119,7 +119,6 @@ var DefaultSocketOptions = SocketOptions{
 	CompletionRingNumDescs: 64,
 	RxRingNumDescs:         64,
 	TxRingNumDescs:         64,
-	DescBatchSize:          16,
 }
 
 type umemRing struct {
@@ -160,7 +159,6 @@ type SocketOptions struct {
 	CompletionRingNumDescs int
 	RxRingNumDescs         int
 	TxRingNumDescs         int
-	DescBatchSize          int
 }
 
 // Stats contains various counters of the XDP socket, such as numbers of
