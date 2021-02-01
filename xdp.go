@@ -327,37 +327,41 @@ func NewSocket(Ifindex int, QueueID int, options *SocketOptions) (xsk *Socket, e
 	sh.Len = options.CompletionRingNumDescs
 	sh.Cap = options.CompletionRingNumDescs
 
-	rxRingSlice, err := syscall.Mmap(xsk.fd, unix.XDP_PGOFF_RX_RING,
-		int(offsets.Rx.Desc+uint64(options.RxRingNumDescs)*uint64(unsafe.Sizeof(unix.XDPDesc{}))),
-		syscall.PROT_READ|syscall.PROT_WRITE,
-		syscall.MAP_SHARED|syscall.MAP_POPULATE)
-	if err != nil {
-		xsk.Close()
-		return nil, fmt.Errorf("syscall.Mmap XDP_PGOFF_RX_RING failed: %v", err)
+	if rxRing {
+		rxRingSlice, err := syscall.Mmap(xsk.fd, unix.XDP_PGOFF_RX_RING,
+			int(offsets.Rx.Desc+uint64(options.RxRingNumDescs)*uint64(unsafe.Sizeof(unix.XDPDesc{}))),
+			syscall.PROT_READ|syscall.PROT_WRITE,
+			syscall.MAP_SHARED|syscall.MAP_POPULATE)
+		if err != nil {
+			xsk.Close()
+			return nil, fmt.Errorf("syscall.Mmap XDP_PGOFF_RX_RING failed: %v", err)
+		}
+
+		xsk.rxRing.Producer = (*uint32)(unsafe.Pointer(uintptr(unsafe.Pointer(&rxRingSlice[0])) + uintptr(offsets.Rx.Producer)))
+		xsk.rxRing.Consumer = (*uint32)(unsafe.Pointer(uintptr(unsafe.Pointer(&rxRingSlice[0])) + uintptr(offsets.Rx.Consumer)))
+		sh = (*reflect.SliceHeader)(unsafe.Pointer(&xsk.rxRing.Descs))
+		sh.Data = uintptr(unsafe.Pointer(&rxRingSlice[0])) + uintptr(offsets.Rx.Desc)
+		sh.Len = options.RxRingNumDescs
+		sh.Cap = options.RxRingNumDescs
 	}
 
-	xsk.rxRing.Producer = (*uint32)(unsafe.Pointer(uintptr(unsafe.Pointer(&rxRingSlice[0])) + uintptr(offsets.Rx.Producer)))
-	xsk.rxRing.Consumer = (*uint32)(unsafe.Pointer(uintptr(unsafe.Pointer(&rxRingSlice[0])) + uintptr(offsets.Rx.Consumer)))
-	sh = (*reflect.SliceHeader)(unsafe.Pointer(&xsk.rxRing.Descs))
-	sh.Data = uintptr(unsafe.Pointer(&rxRingSlice[0])) + uintptr(offsets.Rx.Desc)
-	sh.Len = options.RxRingNumDescs
-	sh.Cap = options.RxRingNumDescs
+	if txRing {
+		txRingSlice, err := syscall.Mmap(xsk.fd, unix.XDP_PGOFF_TX_RING,
+			int(offsets.Tx.Desc+uint64(options.TxRingNumDescs)*uint64(unsafe.Sizeof(unix.XDPDesc{}))),
+			syscall.PROT_READ|syscall.PROT_WRITE,
+			syscall.MAP_SHARED|syscall.MAP_POPULATE)
+		if err != nil {
+			xsk.Close()
+			return nil, fmt.Errorf("syscall.Mmap XDP_PGOFF_TX_RING failed: %v", err)
+		}
 
-	txRingSlice, err := syscall.Mmap(xsk.fd, unix.XDP_PGOFF_TX_RING,
-		int(offsets.Tx.Desc+uint64(options.TxRingNumDescs)*uint64(unsafe.Sizeof(unix.XDPDesc{}))),
-		syscall.PROT_READ|syscall.PROT_WRITE,
-		syscall.MAP_SHARED|syscall.MAP_POPULATE)
-	if err != nil {
-		xsk.Close()
-		return nil, fmt.Errorf("syscall.Mmap XDP_PGOFF_TX_RING failed: %v", err)
+		xsk.txRing.Producer = (*uint32)(unsafe.Pointer(uintptr(unsafe.Pointer(&txRingSlice[0])) + uintptr(offsets.Tx.Producer)))
+		xsk.txRing.Consumer = (*uint32)(unsafe.Pointer(uintptr(unsafe.Pointer(&txRingSlice[0])) + uintptr(offsets.Tx.Consumer)))
+		sh = (*reflect.SliceHeader)(unsafe.Pointer(&xsk.txRing.Descs))
+		sh.Data = uintptr(unsafe.Pointer(&txRingSlice[0])) + uintptr(offsets.Tx.Desc)
+		sh.Len = options.TxRingNumDescs
+		sh.Cap = options.TxRingNumDescs
 	}
-
-	xsk.txRing.Producer = (*uint32)(unsafe.Pointer(uintptr(unsafe.Pointer(&txRingSlice[0])) + uintptr(offsets.Tx.Producer)))
-	xsk.txRing.Consumer = (*uint32)(unsafe.Pointer(uintptr(unsafe.Pointer(&txRingSlice[0])) + uintptr(offsets.Tx.Consumer)))
-	sh = (*reflect.SliceHeader)(unsafe.Pointer(&xsk.txRing.Descs))
-	sh.Data = uintptr(unsafe.Pointer(&txRingSlice[0])) + uintptr(offsets.Tx.Desc)
-	sh.Len = options.TxRingNumDescs
-	sh.Cap = options.TxRingNumDescs
 
 	sa := unix.SockaddrXDP{
 		Flags:   DefaultSocketFlags,
