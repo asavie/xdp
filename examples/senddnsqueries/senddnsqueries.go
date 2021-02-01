@@ -47,7 +47,7 @@ func main() {
 		panic(err)
 	}
 
-	xsk, err := xdp.NewSocket(link.Attrs().Index, QueueID)
+	xsk, err := xdp.NewSocket(link.Attrs().Index, QueueID, nil)
 	if err != nil {
 		panic(err)
 	}

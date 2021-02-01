@@ -82,7 +82,7 @@ func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst n
 	}
 	defer inProg.Detach(inLink.Attrs().Index)
 	log.Printf("opening XDP socket for %s...", inLink.Attrs().Name)
-	inXsk, err := xdp.NewSocket(inLink.Attrs().Index, inLinkQueueID)
+	inXsk, err := xdp.NewSocket(inLink.Attrs().Index, inLinkQueueID, nil)
 	if err != nil {
 		log.Fatalf("failed to open XDP socket for link %s: %v", inLink.Attrs().Name, err)
 	}
@@ -95,7 +95,7 @@ func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst n
 
 	// Note: The XDP socket used for transmitting data does not need an EBPF program.
 	log.Printf("opening XDP socket for %s...", outLink.Attrs().Name)
-	outXsk, err := xdp.NewSocket(outLink.Attrs().Index, outLinkQueueID)
+	outXsk, err := xdp.NewSocket(outLink.Attrs().Index, outLinkQueueID, nil)
 	if err != nil {
 		log.Fatalf("failed to open XDP socket for link %s: %v", outLink.Attrs().Name, err)
 	}
