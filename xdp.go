@@ -714,9 +714,12 @@ func (xsk *Socket) Stats() (Stats, error) {
 
 	stats.Filled = uint64(*xsk.fillRing.Consumer)
 	stats.Received = uint64(*xsk.rxRing.Consumer)
-	stats.Transmitted = uint64(*xsk.txRing.Consumer)
-	stats.Completed = uint64(*xsk.completionRing.Consumer)
-
+	if xsk.txRing.Consumer != nil {
+		stats.Transmitted = uint64(*xsk.txRing.Consumer)
+	}
+	if xsk.completionRing.Consumer != nil {
+		stats.Completed = uint64(*xsk.completionRing.Consumer)
+	}
 	size = uint64(unsafe.Sizeof(stats.KernelStats))
 	rc, _, errno := unix.Syscall6(syscall.SYS_GETSOCKOPT,
 		uintptr(xsk.fd),
