@@ -259,18 +259,30 @@ func NewSocket(Ifindex int, QueueID int, options *SocketOptions) (xsk *Socket, e
 		return nil, fmt.Errorf("unix.SetsockoptUint64 XDP_UMEM_COMPLETION_RING failed: %v", err)
 	}
 
-	err = unix.SetsockoptInt(xsk.fd, unix.SOL_XDP, unix.XDP_RX_RING,
-		options.RxRingNumDescs)
-	if err != nil {
-		xsk.Close()
-		return nil, fmt.Errorf("unix.SetsockoptUint64 XDP_RX_RING failed: %v", err)
+	var rxRing bool
+	if options.RxRingNumDescs > 0 {
+		err = unix.SetsockoptInt(xsk.fd, unix.SOL_XDP, unix.XDP_RX_RING,
+			options.RxRingNumDescs)
+		if err != nil {
+			xsk.Close()
+			return nil, fmt.Errorf("unix.SetsockoptUint64 XDP_RX_RING failed: %v", err)
+		}
+		rxRing = true
 	}
 
-	err = unix.SetsockoptInt(xsk.fd, unix.SOL_XDP, unix.XDP_TX_RING,
-		options.TxRingNumDescs)
-	if err != nil {
-		xsk.Close()
-		return nil, fmt.Errorf("unix.SetsockoptUint64 XDP_TX_RING failed: %v", err)
+	var txRing bool
+	if options.TxRingNumDescs > 0 {
+		err = unix.SetsockoptInt(xsk.fd, unix.SOL_XDP, unix.XDP_TX_RING,
+			options.TxRingNumDescs)
+		if err != nil {
+			xsk.Close()
+			return nil, fmt.Errorf("unix.SetsockoptUint64 XDP_TX_RING failed: %v", err)
+		}
+		txRing = true
+	}
+
+	if !(rxRing || txRing) {
+		return nil, fmt.Errorf("RxRingNumDescs and TxRingNumDescs cannot both be set to zero")
 	}
 
 	var offsets unix.XDPMmapOffsets
