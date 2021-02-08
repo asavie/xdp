@@ -66,7 +66,7 @@ func main() {
 
 	// Create and initialize an XDP socket attached to our chosen network
 	// link.
-	xsk, err := xdp.NewSocket(Ifindex, queueID)
+	xsk, err := xdp.NewSocket(Ifindex, queueID, nil)
 	if err != nil {
 		fmt.Printf("error: failed to create an XDP socket: %v\n", err)
 		return
