@@ -130,7 +130,7 @@ type umemRing struct {
 type rxTxRing struct {
 	Producer *uint32
 	Consumer *uint32
-	Descs    []unix.XDPDesc
+	Descs    []Desc
 }
 
 // A Socket is an implementation of the AF_XDP Linux socket type for reading packets from a device.
@@ -149,6 +149,8 @@ type Socket struct {
 	numFilled      int
 	freeDescs      []bool
 	options        SocketOptions
+	rxDescs        []Desc
+	getDescs       []Desc
 }
 
 // SocketOptions are configuration settings used to bind an XDP socket.
@@ -160,6 +162,9 @@ type SocketOptions struct {
 	RxRingNumDescs         int
 	TxRingNumDescs         int
 }
+
+// Desc represents an XDP Rx/Tx descriptor.
+type Desc unix.XDPDesc
 
 // Stats contains various counters of the XDP socket, such as numbers of
 // sent/received frames.
@@ -329,7 +334,7 @@ func NewSocket(Ifindex int, QueueID int, options *SocketOptions) (xsk *Socket, e
 
 	if rxRing {
 		rxRingSlice, err := syscall.Mmap(xsk.fd, unix.XDP_PGOFF_RX_RING,
-			int(offsets.Rx.Desc+uint64(options.RxRingNumDescs)*uint64(unsafe.Sizeof(unix.XDPDesc{}))),
+			int(offsets.Rx.Desc+uint64(options.RxRingNumDescs)*uint64(unsafe.Sizeof(Desc{}))),
 			syscall.PROT_READ|syscall.PROT_WRITE,
 			syscall.MAP_SHARED|syscall.MAP_POPULATE)
 		if err != nil {
@@ -343,11 +348,13 @@ func NewSocket(Ifindex int, QueueID int, options *SocketOptions) (xsk *Socket, e
 		sh.Data = uintptr(unsafe.Pointer(&rxRingSlice[0])) + uintptr(offsets.Rx.Desc)
 		sh.Len = options.RxRingNumDescs
 		sh.Cap = options.RxRingNumDescs
+
+		xsk.rxDescs = make([]Desc, 0, options.RxRingNumDescs)
 	}
 
 	if txRing {
 		txRingSlice, err := syscall.Mmap(xsk.fd, unix.XDP_PGOFF_TX_RING,
-			int(offsets.Tx.Desc+uint64(options.TxRingNumDescs)*uint64(unsafe.Sizeof(unix.XDPDesc{}))),
+			int(offsets.Tx.Desc+uint64(options.TxRingNumDescs)*uint64(unsafe.Sizeof(Desc{}))),
 			syscall.PROT_READ|syscall.PROT_WRITE,
 			syscall.MAP_SHARED|syscall.MAP_POPULATE)
 		if err != nil {
@@ -377,6 +384,7 @@ func NewSocket(Ifindex int, QueueID int, options *SocketOptions) (xsk *Socket, e
 	for i := 0; i < options.NumFrames; i++ {
 		xsk.freeDescs[i] = true
 	}
+	xsk.getDescs = make([]Desc, 0, options.NumFrames)
 
 	return xsk, nil
 }
@@ -385,7 +393,7 @@ func NewSocket(Ifindex int, QueueID int, options *SocketOptions) (xsk *Socket, e
 // it returns how many descriptors where actually put onto Fill ring queue.
 // The descriptors can be acquired either by calling the GetDescs() method or
 // by calling Receive() method.
-func (xsk *Socket) Fill(descs []unix.XDPDesc) int {
+func (xsk *Socket) Fill(descs []Desc) int {
 	numFreeSlots := xsk.NumFreeFillSlots()
 	if numFreeSlots < len(descs) {
 		descs = descs[:numFreeSlots]
@@ -407,17 +415,17 @@ func (xsk *Socket) Fill(descs []unix.XDPDesc) int {
 
 // Receive returns the descriptors which were filled, i.e. into which frames
 // were received into.
-func (xsk *Socket) Receive(num int) []unix.XDPDesc {
+func (xsk *Socket) Receive(num int) []Desc {
 	numAvailable := xsk.NumReceived()
 	if num > int(numAvailable) {
 		num = int(numAvailable)
 	}
 
-	descs := make([]unix.XDPDesc, num)
+	descs := xsk.rxDescs[:0]
 	cons := *xsk.rxRing.Consumer
 	//fencer.LFence()
 	for i := 0; i < num; i++ {
-		descs[i] = xsk.rxRing.Descs[cons&uint32(xsk.options.RxRingNumDescs-1)]
+		descs = append(descs, xsk.rxRing.Descs[cons&uint32(xsk.options.RxRingNumDescs-1)])
 		cons++
 		xsk.freeDescs[descs[i].Addr/uint64(xsk.options.FrameSize)] = true
 	}
@@ -433,7 +441,7 @@ func (xsk *Socket) Receive(num int) []unix.XDPDesc {
 // descriptors were actually pushed onto the Tx ring queue.
 // The descriptors can be acquired either by calling the GetDescs() method or
 // by calling Receive() method.
-func (xsk *Socket) Transmit(descs []unix.XDPDesc) (numSubmitted int) {
+func (xsk *Socket) Transmit(descs []Desc) (numSubmitted int) {
 	numFreeSlots := xsk.NumFreeTxSlots()
 	if len(descs) > numFreeSlots {
 		descs = descs[:numFreeSlots]
@@ -533,26 +541,28 @@ func (xsk *Socket) Poll(timeout int) (numReceived int, numCompleted int, err err
 }
 
 // GetDescs returns up to n descriptors which are not currently in use.
-func (xsk *Socket) GetDescs(n int) []unix.XDPDesc {
+func (xsk *Socket) GetDescs(n int) []Desc {
 	if n > len(xsk.freeDescs) {
 		n = len(xsk.freeDescs)
 	}
-	descs := make([]unix.XDPDesc, len(xsk.freeDescs))
+	descs := xsk.getDescs[:0]
 	j := 0
 	for i := 0; i < len(xsk.freeDescs) && j < n; i++ {
 		if xsk.freeDescs[i] == true {
-			descs[j].Addr = uint64(i) * uint64(xsk.options.FrameSize)
-			descs[j].Len = uint32(xsk.options.FrameSize)
+			descs = append(descs, Desc{
+				Addr: uint64(i) * uint64(xsk.options.FrameSize),
+				Len:  uint32(xsk.options.FrameSize),
+			})
 			j++
 		}
 	}
-	return descs[:j]
+	return descs
 }
 
 // GetFrame returns the buffer containing the frame corresponding to the given
 // descriptor. The returned byte slice points to the actual buffer of the
 // corresponding frame, so modiyfing this slice modifies the frame contents.
-func (xsk *Socket) GetFrame(d unix.XDPDesc) []byte {
+func (xsk *Socket) GetFrame(d Desc) []byte {
 	return xsk.umem[d.Addr : d.Addr+uint64(d.Len)]
 }
 
