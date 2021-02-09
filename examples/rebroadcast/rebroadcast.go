@@ -90,6 +90,7 @@ func main() {
 			// frames.
 			xsk.Fill(xsk.GetDescs(n))
 		}
+		fmt.Printf(" fill=%d, rx=%d, tx=%d, complete=%d\n", xsk.NumFilled(), xsk.NumReceived(), xsk.NumTransmitted(), xsk.NumCompleted())
 
 		// Wait for events: either receive - meaning the kernel has
 		// produced one or more descriptors filled with a received
@@ -105,6 +106,7 @@ func main() {
 			fmt.Printf("error: %v\n", err)
 			return
 		}
+		fmt.Printf(" fill=%d, rx=%d, tx=%d, complete=%d\n", xsk.NumFilled(), xsk.NumReceived(), xsk.NumTransmitted(), xsk.NumCompleted())
 		fmt.Printf("received: %d\ncompleted: %d\n", numRx, numCompl)
 
 		if numRx > 0 {
@@ -131,6 +133,7 @@ func main() {
 			// Send the modified frames back out.
 			n := xsk.Transmit(rxDescs)
 			fmt.Printf("sent: %d\n", n)
+			fmt.Printf(" fill=%d, rx=%d, tx=%d, complete=%d\n", xsk.NumFilled(), xsk.NumReceived(), xsk.NumTransmitted(), xsk.NumCompleted())
 		}
 	}
 }

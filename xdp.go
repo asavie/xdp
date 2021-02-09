@@ -471,9 +471,9 @@ func (xsk *Socket) Transmit(descs []Desc) (numSubmitted int) {
 		if rc != 0 {
 			switch errno {
 			case unix.EINTR:
-				fallthrough
-			case unix.EAGAIN:
 				// try again
+			case unix.EAGAIN:
+				return
 			case unix.EBUSY: // "completed but not sent"
 				return
 			default:
@@ -500,44 +500,32 @@ func (xsk *Socket) FD() int {
 // Receive() method call.
 func (xsk *Socket) Poll(timeout int) (numReceived int, numCompleted int, err error) {
 	var events int16
-	var n int
-	var pfds [1]unix.PollFd
-
-	for {
-		events = 0
-		if xsk.numFilled > 0 {
-			events |= unix.POLLIN
-		}
-		if xsk.numTransmitted > 0 {
-			events |= unix.POLLOUT
-		}
-		if events == 0 {
-			return
-		}
-
-		pfds[0].Fd = int32(xsk.fd)
-		pfds[0].Events = events
-
-		n, err = unix.Poll(pfds[:], timeout)
-		if err != nil {
-			if err == unix.EINTR {
-				continue
-			}
-			return
-		}
-		if n == 0 {
-			return
-		}
-
-		numReceived = xsk.NumReceived()
-		if numCompleted = xsk.NumCompleted(); numCompleted > 0 {
-			xsk.Complete(numCompleted)
-		}
-
-		if numReceived > 0 || numCompleted > 0 {
-			return
-		} // else continue - kernel notified it consumed from Tx
+	if xsk.numFilled > 0 {
+		events |= unix.POLLIN
 	}
+	if xsk.numTransmitted > 0 {
+		events |= unix.POLLOUT
+	}
+	if events == 0 {
+		return
+	}
+
+	var pfds [1]unix.PollFd
+	pfds[0].Fd = int32(xsk.fd)
+	pfds[0].Events = events
+	for err = unix.EINTR; err == unix.EINTR; {
+		_, err = unix.Poll(pfds[:], timeout)
+	}
+	if err != nil {
+		return 0, 0, err
+	}
+
+	numReceived = xsk.NumReceived()
+	if numCompleted = xsk.NumCompleted(); numCompleted > 0 {
+		xsk.Complete(numCompleted)
+	}
+
+	return
 }
 
 // GetDescs returns up to n descriptors which are not currently in use.
