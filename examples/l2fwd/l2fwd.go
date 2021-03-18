@@ -192,7 +192,7 @@ func forwardFrames(input *xdp.Socket, output *xdp.Socket, dstMac net.HardwareAdd
 	return
 }
 
-func replaceDstMac(xsk *xdp.Socket, descs []unix.XDPDesc, dstMac net.HardwareAddr) {
+func replaceDstMac(xsk *xdp.Socket, descs []xdp.Desc, dstMac net.HardwareAddr) {
 	for _, d := range descs {
 		frame := xsk.GetFrame(d)
 		copy(frame, dstMac)
