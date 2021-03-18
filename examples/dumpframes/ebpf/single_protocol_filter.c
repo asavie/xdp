@@ -47,7 +47,7 @@ SEC("xdp_sock") int xdp_sock_prog(struct xdp_md *ctx)
 	if (!qidconf)
 		return XDP_PASS;
 
-	// redirect udp packets to an xdp socket; pass all other packets to the kernel
+	// redirect packets to an xdp socket that match the given IPv4 or IPv6 protocol; pass all other packets to the kernel
 	void *data = (void*)(long)ctx->data;
 	void *data_end = (void*)(long)ctx->data_end;
 	struct ethhdr *eth = data;
