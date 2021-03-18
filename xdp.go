@@ -109,16 +109,17 @@ import (
 
 	"github.com/cilium/ebpf"
 	"golang.org/x/sys/unix"
+	"github.com/vishvananda/netlink"
 )
 
 // DefaultSocketOptions is the default SocketOptions used by an xdp.Socket created without specifying options.
 var DefaultSocketOptions = SocketOptions{
-	NumFrames:              128,
+	NumFrames:              2048,
 	FrameSize:              2048,
-	FillRingNumDescs:       64,
-	CompletionRingNumDescs: 64,
-	RxRingNumDescs:         64,
-	TxRingNumDescs:         64,
+	FillRingNumDescs:       2048,
+	CompletionRingNumDescs: 2048,
+	RxRingNumDescs:         2048,
+	TxRingNumDescs:         2048,
 }
 
 type umemRing struct {
@@ -215,6 +216,10 @@ func NewSocket(Ifindex int, QueueID int, options *SocketOptions) (xsk *Socket, e
 		options = &DefaultSocketOptions
 	}
 	xsk = &Socket{fd: -1, ifindex: Ifindex, options: *options}
+
+	var link netlink.Link
+
+	link, err = netlink.LinkByIndex(Ifindex)
 
 	xsk.fd, err = syscall.Socket(unix.AF_XDP, syscall.SOCK_RAW, 0)
 	if err != nil {
@@ -380,6 +385,50 @@ func NewSocket(Ifindex int, QueueID int, options *SocketOptions) (xsk *Socket, e
 		return nil, fmt.Errorf("syscall.Bind SockaddrXDP failed: %v", err)
 	}
 
+	colle_name := "/home/mydir/bpf.o"
+	colle, err := ebpf.LoadCollection(colle_name);
+	if err != nil {
+		xsk.Close()
+		return nil, fmt.Errorf("load colle fail :%v", err)
+	}
+
+	if prog := colle.Programs["xdp_redirect_udp_func"]; prog != nil {
+		xsk.program = prog
+	} else {
+		xsk.Close()
+		fmt.Println("xdp prog not exist")
+	}
+
+	if err = netlink.LinkSetXdpFdWithFlags(link, xsk.program.FD(), int(DefaultXdpFlags)); err != nil {
+		xsk.Close()
+		return nil, fmt.Errorf("netlink.LinkSetXdpFd failed: %v", err)
+	}
+
+
+	if map1 := colle.Maps["xsk_map"]; map1 != nil {
+		xsk.xsksMap = map1
+	} else {
+		xsk.Close()
+		fmt.Println("xsk map fail")
+	}
+
+	if map2 := colle.Maps["qidconf_map"]; map2 != nil {
+		xsk.qidconfMap = map2
+	} else {
+		xsk.Close()
+		fmt.Println("qidconf map fail")
+	}
+
+	if err = xsk.qidconfMap.Put(uint32(QueueID), uint32(1)); err != nil {
+		xsk.Close()
+		return nil, fmt.Errorf("failed to update qidconfMap: %v", err)
+	}
+
+	if err = xsk.xsksMap.Put(uint32(QueueID), uint32(xsk.fd)); err != nil {
+		xsk.Close()
+		return nil, fmt.Errorf("failed to update xsksMap: %v", err)
+	}
+
 	xsk.freeDescs = make([]bool, options.NumFrames)
 	for i := 0; i < options.NumFrames; i++ {
 		xsk.freeDescs[i] = true
@@ -403,7 +452,6 @@ func (xsk *Socket) Fill(descs []Desc) int {
 	for _, desc := range descs {
 		xsk.fillRing.Descs[prod&uint32(xsk.options.FillRingNumDescs-1)] = desc.Addr
 		prod++
-		xsk.freeDescs[desc.Addr/uint64(xsk.options.FrameSize)] = false
 	}
 	//fencer.SFence()
 	*xsk.fillRing.Producer = prod
@@ -427,7 +475,6 @@ func (xsk *Socket) Receive(num int) []Desc {
 	for i := 0; i < num; i++ {
 		descs = append(descs, xsk.rxRing.Descs[cons&uint32(xsk.options.RxRingNumDescs-1)])
 		cons++
-		xsk.freeDescs[descs[i].Addr/uint64(xsk.options.FrameSize)] = true
 	}
 	//fencer.MFence()
 	*xsk.rxRing.Consumer = cons
@@ -447,11 +494,14 @@ func (xsk *Socket) Transmit(descs []Desc) (numSubmitted int) {
 		descs = descs[:numFreeSlots]
 	}
 
+	if numFreeSlots == 0 {
+		return
+	}
+
 	prod := *xsk.txRing.Producer
 	for _, desc := range descs {
 		xsk.txRing.Descs[prod&uint32(xsk.options.TxRingNumDescs-1)] = desc
 		prod++
-		xsk.freeDescs[desc.Addr/uint64(xsk.options.FrameSize)] = false
 	}
 	//fencer.SFence()
 	*xsk.txRing.Producer = prod
@@ -542,6 +592,7 @@ func (xsk *Socket) GetDescs(n int) []Desc {
 				Len:  uint32(xsk.options.FrameSize),
 			})
 			j++
+			xsk.freeDescs[i] =false	//add by liheng
 		}
 	}
 	return descs
