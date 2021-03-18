@@ -56,7 +56,7 @@ SEC("xdp_sock") int xdp_sock_prog(struct xdp_md *ctx)
 		if (bpf_htons(h_proto) == ETH_P_IP) {
 			struct iphdr *ip = data + sizeof(*eth);
 			if ((void*)ip + sizeof(*ip) <= data_end) {
-			if (ip->protocol == PROTO) {
+				if (ip->protocol == PROTO) {
 					if (*qidconf)
 						return bpf_redirect_map(&xsks_map, index, 0);
 				}
@@ -64,7 +64,7 @@ SEC("xdp_sock") int xdp_sock_prog(struct xdp_md *ctx)
 		} else if (bpf_htons(h_proto) == ETH_P_IPV6) {
 			struct ipv6hdr *ip = data + sizeof(*eth);
 			if ((void*)ip + sizeof(*ip) <= data_end) {
-			if (ip->nexthdr == PROTO) {
+				if (ip->nexthdr == PROTO) {
 					if (*qidconf)
 						return bpf_redirect_map(&xsks_map, index, 0);
 				}
