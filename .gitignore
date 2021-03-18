@@ -13,3 +13,7 @@
 
 # Developer
 .vscode
+
+# ebpf binaries
+*.o
+
