@@ -5,15 +5,15 @@
 #include <linux/udp.h>
 #include <linux/if_ether.h>
 #include <linux/ip.h>
+#include <linux/ipv6.h>
 #include <bpf/bpf_helpers.h>
+#include <bpf/bpf_endian.h>
 
 
 #define MAX_SOCKS 64
 
 static volatile unsigned const char PROTO;
 static volatile unsigned const char PROTO = IPPROTO_ICMP;
-
-#define __bpf_constant_htons(x) ___constant_swab16(x)
 
 //Ensure map references are available.
 /*
@@ -51,12 +51,24 @@ SEC("xdp_sock") int xdp_sock_prog(struct xdp_md *ctx)
 	void *data = (void*)(long)ctx->data;
 	void *data_end = (void*)(long)ctx->data_end;
 	struct ethhdr *eth = data;
+	__u16 h_proto;
+	h_proto = eth->h_proto;
 	if ((void*)eth + sizeof(*eth) <= data_end) {
-		struct iphdr *ip = data + sizeof(*eth);
-		if ((void*)ip + sizeof(*ip) <= data_end) {
-		if (ip->protocol == PROTO) {
-				if (*qidconf)
-					return bpf_redirect_map(&xsks_map, index, 0);
+		if (bpf_htons(h_proto) == ETH_P_IP) {
+			struct iphdr *ip = data + sizeof(*eth);
+			if ((void*)ip + sizeof(*ip) <= data_end) {
+			if (ip->protocol == PROTO) {
+					if (*qidconf)
+						return bpf_redirect_map(&xsks_map, index, 0);
+				}
+			}
+		} else if (bpf_htons(h_proto) == ETH_P_IPV6) {
+			struct ipv6hdr *ip = data + sizeof(*eth);
+			if ((void*)ip + sizeof(*ip) <= data_end) {
+			if (ip->nexthdr == PROTO) {
+					if (*qidconf)
+						return bpf_redirect_map(&xsks_map, index, 0);
+				}
 			}
 		}
 	}
