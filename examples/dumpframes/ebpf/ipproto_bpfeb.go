@@ -11,72 +11,103 @@ import (
 	"github.com/cilium/ebpf"
 )
 
-type ipprotoSpecs struct {
-	ProgramXdpSockProg *ebpf.ProgramSpec `ebpf:"xdp_sock_prog"`
-	MapQidconfMap      *ebpf.MapSpec     `ebpf:"qidconf_map"`
-	MapXsksMap         *ebpf.MapSpec     `ebpf:"xsks_map"`
-	SectionRodata      *ebpf.MapSpec     `ebpf:".rodata"`
-}
-
-func newIpprotoSpecs() (*ipprotoSpecs, error) {
+// loadIpproto returns the embedded CollectionSpec for ipproto.
+func loadIpproto() (*ebpf.CollectionSpec, error) {
 	reader := bytes.NewReader(_IpprotoBytes)
 	spec, err := ebpf.LoadCollectionSpecFromReader(reader)
 	if err != nil {
 		return nil, fmt.Errorf("can't load ipproto: %w", err)
 	}
 
-	specs := new(ipprotoSpecs)
-	if err := spec.Assign(specs); err != nil {
-		return nil, fmt.Errorf("can't assign ipproto: %w", err)
-	}
-
-	return specs, nil
+	return spec, err
 }
 
-func (s *ipprotoSpecs) CollectionSpec() *ebpf.CollectionSpec {
-	return &ebpf.CollectionSpec{
-		Programs: map[string]*ebpf.ProgramSpec{
-			"xdp_sock_prog": s.ProgramXdpSockProg,
-		},
-		Maps: map[string]*ebpf.MapSpec{
-			"qidconf_map": s.MapQidconfMap,
-			"xsks_map":    s.MapXsksMap,
-			".rodata":     s.SectionRodata,
-		},
+// loadIpprotoObjects loads ipproto and converts it into a struct.
+//
+// The following types are suitable as obj argument:
+//
+//     *ipprotoObjects
+//     *ipprotoPrograms
+//     *ipprotoMaps
+//
+// See ebpf.CollectionSpec.LoadAndAssign documentation for details.
+func loadIpprotoObjects(obj interface{}, opts *ebpf.CollectionOptions) error {
+	spec, err := loadIpproto()
+	if err != nil {
+		return err
 	}
+
+	return spec.LoadAndAssign(obj, opts)
 }
 
-func (s *ipprotoSpecs) Load(opts *ebpf.CollectionOptions) (*ipprotoObjects, error) {
-	var objs ipprotoObjects
-	if err := s.CollectionSpec().LoadAndAssign(&objs, opts); err != nil {
-		return nil, err
-	}
-	return &objs, nil
+// ipprotoSpecs contains maps and programs before they are loaded into the kernel.
+//
+// It can be passed ebpf.CollectionSpec.Assign.
+type ipprotoSpecs struct {
+	ipprotoProgramSpecs
+	ipprotoMapSpecs
 }
 
-func (s *ipprotoSpecs) Copy() *ipprotoSpecs {
-	return &ipprotoSpecs{
-		ProgramXdpSockProg: s.ProgramXdpSockProg.Copy(),
-		MapQidconfMap:      s.MapQidconfMap.Copy(),
-		MapXsksMap:         s.MapXsksMap.Copy(),
-		SectionRodata:      s.SectionRodata.Copy(),
-	}
+// ipprotoSpecs contains programs before they are loaded into the kernel.
+//
+// It can be passed ebpf.CollectionSpec.Assign.
+type ipprotoProgramSpecs struct {
+	XdpSockProg *ebpf.ProgramSpec `ebpf:"xdp_sock_prog"`
 }
 
+// ipprotoMapSpecs contains maps before they are loaded into the kernel.
+//
+// It can be passed ebpf.CollectionSpec.Assign.
+type ipprotoMapSpecs struct {
+	QidconfMap *ebpf.MapSpec `ebpf:"qidconf_map"`
+	XsksMap    *ebpf.MapSpec `ebpf:"xsks_map"`
+}
+
+// ipprotoObjects contains all objects after they have been loaded into the kernel.
+//
+// It can be passed to loadIpprotoObjects or ebpf.CollectionSpec.LoadAndAssign.
 type ipprotoObjects struct {
-	ProgramXdpSockProg *ebpf.Program `ebpf:"xdp_sock_prog"`
-	MapQidconfMap      *ebpf.Map     `ebpf:"qidconf_map"`
-	MapXsksMap         *ebpf.Map     `ebpf:"xsks_map"`
-	SectionRodata      *ebpf.Map     `ebpf:".rodata"`
+	ipprotoPrograms
+	ipprotoMaps
 }
 
 func (o *ipprotoObjects) Close() error {
-	for _, closer := range []io.Closer{
-		o.ProgramXdpSockProg,
-		o.MapQidconfMap,
-		o.MapXsksMap,
-		o.SectionRodata,
-	} {
+	return _IpprotoClose(
+		&o.ipprotoPrograms,
+		&o.ipprotoMaps,
+	)
+}
+
+// ipprotoMaps contains all maps after they have been loaded into the kernel.
+//
+// It can be passed to loadIpprotoObjects or ebpf.CollectionSpec.LoadAndAssign.
+type ipprotoMaps struct {
+	QidconfMap *ebpf.Map `ebpf:"qidconf_map"`
+	XsksMap    *ebpf.Map `ebpf:"xsks_map"`
+}
+
+func (m *ipprotoMaps) Close() error {
+	return _IpprotoClose(
+		m.QidconfMap,
+		m.XsksMap,
+	)
+}
+
+// ipprotoPrograms contains all programs after they have been loaded into the kernel.
+//
+// It can be passed to loadIpprotoObjects or ebpf.CollectionSpec.LoadAndAssign.
+type ipprotoPrograms struct {
+	XdpSockProg *ebpf.Program `ebpf:"xdp_sock_prog"`
+}
+
+func (p *ipprotoPrograms) Close() error {
+	return _IpprotoClose(
+		p.XdpSockProg,
+	)
+}
+
+func _IpprotoClose(closers ...io.Closer) error {
+	for _, closer := range closers {
 		if err := closer.Close(); err != nil {
 			return err
 		}

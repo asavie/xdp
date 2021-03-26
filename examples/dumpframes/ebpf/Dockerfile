@@ -10,6 +10,6 @@ ENV PATH=$PATH:/usr/local/go/bin:/root/go/bin/
 
 RUN dnf -y install git
 
-RUN go get github.com/cilium/ebpf/cmd/bpf2go
+RUN go get github.com/cilium/ebpf/cmd/bpf2go@v0.4.0
 
 ENTRYPOINT ["bash", "-c", "cd /target/examples/dumpframes/ebpf && go generate"]
