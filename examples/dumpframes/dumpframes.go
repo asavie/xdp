@@ -19,6 +19,7 @@ import (
 	"net"
 
 	"github.com/asavie/xdp"
+	"github.com/asavie/xdp/examples/dumpframes/ebpf"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 )
@@ -26,11 +27,13 @@ import (
 func main() {
 	var linkName string
 	var queueID int
+	var protocol int64
 
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 
 	flag.StringVar(&linkName, "linkname", "enp3s0", "The network link on which rebroadcast should run on.")
 	flag.IntVar(&queueID, "queueid", 0, "The ID of the Rx queue to which to attach to on the network link.")
+	flag.Int64Var(&protocol, "ip-proto", 0, "If greater than 0 and less than or equal to 255, limit xdp bpf_redirect_map to packets with the specified IP protocol number.")
 	flag.Parse()
 
 	interfaces, err := net.Interfaces()
@@ -51,8 +54,14 @@ func main() {
 		return
 	}
 
+	var program *xdp.Program
+
 	// Create a new XDP eBPF program and attach it to our chosen network link.
-	program, err := xdp.NewProgram(queueID + 1)
+	if protocol == 0 {
+		program, err = xdp.NewProgram(queueID + 1)
+	} else {
+		program, err = ebpf.NewIPProtoProgram(uint32(protocol), nil)
+	}
 	if err != nil {
 		fmt.Printf("error: failed to create xdp program: %v\n", err)
 		return
