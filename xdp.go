@@ -135,22 +135,22 @@ type rxTxRing struct {
 
 // A Socket is an implementation of the AF_XDP Linux socket type for reading packets from a device.
 type Socket struct {
-	fd             int
-	umem           []byte
-	fillRing       umemRing
-	rxRing         rxTxRing
-	txRing         rxTxRing
-	completionRing umemRing
-	qidconfMap     *ebpf.Map
-	xsksMap        *ebpf.Map
-	program        *ebpf.Program
-	ifindex        int
-	numTransmitted int
-	numFilled      int
-	freeDescs      []bool
-	options        SocketOptions
-	rxDescs        []Desc
-	getDescs       []Desc
+	fd                       int
+	umem                     []byte
+	fillRing                 umemRing
+	rxRing                   rxTxRing
+	txRing                   rxTxRing
+	completionRing           umemRing
+	qidconfMap               *ebpf.Map
+	xsksMap                  *ebpf.Map
+	program                  *ebpf.Program
+	ifindex                  int
+	numTransmitted           int
+	numFilled                int
+	freeRXDescs, freeTXDescs []bool
+	options                  SocketOptions
+	rxDescs                  []Desc
+	getTXDescs, getRXDescs   []Desc
 }
 
 // SocketOptions are configuration settings used to bind an XDP socket.
@@ -380,11 +380,16 @@ func NewSocket(Ifindex int, QueueID int, options *SocketOptions) (xsk *Socket, e
 		return nil, fmt.Errorf("syscall.Bind SockaddrXDP failed: %v", err)
 	}
 
-	xsk.freeDescs = make([]bool, options.NumFrames)
-	for i := 0; i < options.NumFrames; i++ {
-		xsk.freeDescs[i] = true
+	xsk.freeRXDescs = make([]bool, options.NumFrames)
+	xsk.freeTXDescs = make([]bool, options.NumFrames)
+	for i := range xsk.freeRXDescs {
+		xsk.freeRXDescs[i] = true
 	}
-	xsk.getDescs = make([]Desc, 0, options.NumFrames)
+	for i := range xsk.freeTXDescs {
+		xsk.freeTXDescs[i] = true
+	}
+	xsk.getTXDescs = make([]Desc, 0, options.CompletionRingNumDescs)
+	xsk.getRXDescs = make([]Desc, 0, options.FillRingNumDescs)
 
 	return xsk, nil
 }
@@ -403,7 +408,7 @@ func (xsk *Socket) Fill(descs []Desc) int {
 	for _, desc := range descs {
 		xsk.fillRing.Descs[prod&uint32(xsk.options.FillRingNumDescs-1)] = desc.Addr
 		prod++
-		xsk.freeDescs[desc.Addr/uint64(xsk.options.FrameSize)] = false
+		xsk.freeRXDescs[desc.Addr/uint64(xsk.options.FrameSize)] = false
 	}
 	//fencer.SFence()
 	*xsk.fillRing.Producer = prod
@@ -427,7 +432,7 @@ func (xsk *Socket) Receive(num int) []Desc {
 	for i := 0; i < num; i++ {
 		descs = append(descs, xsk.rxRing.Descs[cons&uint32(xsk.options.RxRingNumDescs-1)])
 		cons++
-		xsk.freeDescs[descs[i].Addr/uint64(xsk.options.FrameSize)] = true
+		xsk.freeRXDescs[descs[i].Addr/uint64(xsk.options.FrameSize)] = true
 	}
 	//fencer.MFence()
 	*xsk.rxRing.Consumer = cons
@@ -451,7 +456,7 @@ func (xsk *Socket) Transmit(descs []Desc) (numSubmitted int) {
 	for _, desc := range descs {
 		xsk.txRing.Descs[prod&uint32(xsk.options.TxRingNumDescs-1)] = desc
 		prod++
-		xsk.freeDescs[desc.Addr/uint64(xsk.options.FrameSize)] = false
+		xsk.freeTXDescs[desc.Addr/uint64(xsk.options.FrameSize)] = false
 	}
 	//fencer.SFence()
 	*xsk.txRing.Producer = prod
@@ -529,14 +534,34 @@ func (xsk *Socket) Poll(timeout int) (numReceived int, numCompleted int, err err
 }
 
 // GetDescs returns up to n descriptors which are not currently in use.
-func (xsk *Socket) GetDescs(n int) []Desc {
-	if n > len(xsk.freeDescs) {
-		n = len(xsk.freeDescs)
+// if rx is true, return desc in first half of umem, 2nd half otherwise
+func (xsk *Socket) GetDescs(n int, rx bool) []Desc {
+	if n > cap(xsk.getRXDescs) {
+		n = cap(xsk.getRXDescs)
 	}
-	descs := xsk.getDescs[:0]
+	if !rx {
+		if n > cap(xsk.getTXDescs) {
+			n = cap(xsk.getTXDescs)
+		}
+	}
+	// numOfUMEMChunks := len(xsk.freeRXDescs) / 2
+	// if n > numOfUMEMChunks {
+	// 	n = numOfUMEMChunks
+	// }
+
+	descs := xsk.getRXDescs[:0]
 	j := 0
-	for i := 0; i < len(xsk.freeDescs) && j < n; i++ {
-		if xsk.freeDescs[i] == true {
+	start := 0
+	end := cap(xsk.getRXDescs)
+	freeList := xsk.freeRXDescs
+	if !rx {
+		start = cap(xsk.getRXDescs)
+		end = len(xsk.freeTXDescs)
+		freeList = xsk.freeTXDescs
+		descs = xsk.getTXDescs[:0]
+	}
+	for i := start; i < end && j < n; i++ {
+		if freeList[i] == true {
 			descs = append(descs, Desc{
 				Addr: uint64(i) * uint64(xsk.options.FrameSize),
 				Len:  uint32(xsk.options.FrameSize),
@@ -613,7 +638,7 @@ func (xsk *Socket) Complete(n int) {
 	for i := 0; i < n; i++ {
 		addr := xsk.completionRing.Descs[cons&uint32(xsk.options.CompletionRingNumDescs-1)]
 		cons++
-		xsk.freeDescs[addr/uint64(xsk.options.FrameSize)] = true
+		xsk.freeTXDescs[addr/uint64(xsk.options.FrameSize)] = true
 	}
 	//fencer.MFence()
 	*xsk.completionRing.Consumer = cons
