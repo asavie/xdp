@@ -219,6 +219,30 @@ func NewProgram(maxQueueEntries int) (*Program, error) {
 	return &Program{Program: program, Queues: qidconfMap, Sockets: xsksMap}, nil
 }
 
+// LoadProgram load a external XDP program, along with queue and socket map;
+// fname is the BPF kernel program file (.o);
+// funcname is the function name in the program file;
+// qidmapname is the Queues map name;
+// xskmapname is the Sockets map name;
+func LoadProgram(fname, funcname, qidmapname, xskmapname string) (*Program, error) {
+	prog := new(Program)
+	col, err := ebpf.LoadCollection(fname)
+	if err != nil {
+		return nil, err
+	}
+	var ok bool
+	if prog.Program, ok = col.Programs[funcname]; !ok {
+		return nil, fmt.Errorf("%v doesn't contain a function named %v", fname, funcname)
+	}
+	if prog.Queues, ok = col.Maps[qidmapname]; !ok {
+		return nil, fmt.Errorf("%v doesn't contain a queue map named %v", fname, qidmapname)
+	}
+	if prog.Sockets, ok = col.Maps[xskmapname]; !ok {
+		return nil, fmt.Errorf("%v doesn't contain a socket map named %v", fname, xskmapname)
+	}
+	return prog, nil
+}
+
 // removeProgram removes an existing XDP program from the given network interface.
 func removeProgram(Ifindex int) error {
 	var link netlink.Link
