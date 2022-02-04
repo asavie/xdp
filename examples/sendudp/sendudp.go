@@ -98,7 +98,7 @@ func main() {
 
 	// Fill all the frames in UMEM with the pre-generated UDP packet.
 
-	descs := xsk.GetDescs(math.MaxInt32)
+	descs := xsk.GetDescs(math.MaxInt32, false)
 	for i := range descs {
 		frameLen = copy(xsk.GetFrame(descs[i]), buf.Bytes())
 	}
@@ -127,7 +127,7 @@ func main() {
 	}()
 
 	for {
-		descs := xsk.GetDescs(xsk.NumFreeTxSlots())
+		descs := xsk.GetDescs(xsk.NumFreeTxSlots(), false)
 		for i := range descs {
 			descs[i].Len = uint32(frameLen)
 		}
