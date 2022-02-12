@@ -1,0 +1,24 @@
+name: Build & Test
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v[0-9]+\.[0-9]+\.[0-9]+'
+  pull_request:
+    branches:
+      - master
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: [1.17.x]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup Go environment (${{ matrix.go }})
+      uses: actions/setup-go@v2.2.0
+      with:
+        go-version: ${{ matrix.go }}
+    - run: go build ./...
