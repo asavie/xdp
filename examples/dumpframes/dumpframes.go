@@ -19,7 +19,8 @@ import (
 	"net"
 
 	"github.com/asavie/xdp"
-	"github.com/asavie/xdp/examples/dumpframes/ebpf"
+	ipproto "github.com/asavie/xdp/examples/dumpframes/ebpf"
+	"github.com/cilium/ebpf"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 )
@@ -60,7 +61,9 @@ func main() {
 	if protocol == 0 {
 		program, err = xdp.NewProgram(queueID + 1)
 	} else {
-		program, err = ebpf.NewIPProtoProgram(uint32(protocol), nil)
+		var prog, qidConf, xsk = &ebpf.Program{}, &ebpf.Map{}, &ebpf.Map{}
+		prog, qidConf, xsk, err = ipproto.NewIPProtoProgram(uint32(protocol), nil)
+		program = &xdp.Program{Program: prog, Queues: qidConf, Sockets: xsk}
 	}
 	if err != nil {
 		fmt.Printf("error: failed to create xdp program: %v\n", err)
@@ -95,7 +98,7 @@ func main() {
 			// descriptors and push them onto the Fill ring queue
 			// for the kernel to fill them with the received
 			// frames.
-			xsk.Fill(xsk.GetDescs(n))
+			xsk.Fill(xsk.GetDescs(n, true))
 		}
 
 		// Wait for receive - meaning the kernel has
