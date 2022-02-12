@@ -81,7 +81,7 @@ transmits them back out the same network link:
 		}()
 
 		for {
-			xsk.Fill(xsk.GetDescs(xsk.NumFreeFillSlots()))
+			xsk.Fill(xsk.GetDescs(xsk.NumFreeFillSlots(), true))
 			numRx, _, err := xsk.Poll(-1)
 			if err != nil {
 				panic(err)

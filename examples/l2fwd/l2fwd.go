@@ -125,8 +125,8 @@ func forwardL2(verbose bool, inLink netlink.Link, inLinkQueueID int, inLinkDst n
 	fds[0].Fd = int32(inXsk.FD())
 	fds[1].Fd = int32(outXsk.FD())
 	for {
-		inXsk.Fill(inXsk.GetDescs(inXsk.NumFreeFillSlots()))
-		outXsk.Fill(outXsk.GetDescs(outXsk.NumFreeFillSlots()))
+		inXsk.Fill(inXsk.GetDescs(inXsk.NumFreeFillSlots(), true))
+		outXsk.Fill(outXsk.GetDescs(outXsk.NumFreeFillSlots(), true))
 
 		fds[0].Events = unix.POLLIN
 		if inXsk.NumTransmitted() > 0 {
@@ -172,7 +172,7 @@ func forwardFrames(input *xdp.Socket, output *xdp.Socket, dstMac net.HardwareAdd
 	inDescs := input.Receive(input.NumReceived())
 	replaceDstMac(input, inDescs, dstMac)
 
-	outDescs := output.GetDescs(output.NumFreeTxSlots())
+	outDescs := output.GetDescs(output.NumFreeTxSlots(), false)
 
 	if len(inDescs) > len(outDescs) {
 		inDescs = inDescs[:len(outDescs)]

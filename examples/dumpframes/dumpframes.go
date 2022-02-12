@@ -95,7 +95,7 @@ func main() {
 			// descriptors and push them onto the Fill ring queue
 			// for the kernel to fill them with the received
 			// frames.
-			xsk.Fill(xsk.GetDescs(n))
+			xsk.Fill(xsk.GetDescs(n, true))
 		}
 
 		// Wait for receive - meaning the kernel has
