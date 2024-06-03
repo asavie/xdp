@@ -25,9 +25,11 @@ Fedora Linux, this can be done by running `ulimit -l <new-limit>` command, or
 to make it permanent, by creating a file at
 `/etc/security/limits.d/50-lockedmem.conf` with e.g. the following contents
 (1MiB should be enough for this package):
-	* - lockedmem 1048576
+  - - lockedmem 1048576
+
 logging out and logging back in.
 When you hit this limit, you'll get an error that looks like this:
+
 	error: failed to create an XDP socket: ebpf.NewMap qidconf_map failed: map create: operation not permitted
 
 Here is a minimal example of a program which receives network frames,
@@ -465,14 +467,16 @@ func (xsk *Socket) Transmit(descs []Desc) (numSubmitted int) {
 
 	numSubmitted = len(descs)
 
+	var msg unix.Msghdr
+
 	var rc uintptr
 	var errno syscall.Errno
 	for {
-		rc, _, errno = unix.Syscall6(syscall.SYS_SENDTO,
+		rc, _, errno = unix.Syscall6(syscall.SYS_SENDMSG,
 			uintptr(xsk.fd),
-			0, 0,
-			uintptr(unix.MSG_DONTWAIT),
-			0, 0)
+			uintptr(unsafe.Pointer(&msg)),
+			unix.MSG_DONTWAIT,
+			0, 0, 0)
 		if rc != 0 {
 			switch errno {
 			case unix.EINTR:
