@@ -1,3 +1,9 @@
+**The project is continued here:** https://github.com/slavc/xdp
+
+https://github.com/asavie/xdp is now archived.
+
+----
+
 # xdp
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/asavie/xdp.svg)](https://pkg.go.dev/github.com/asavie/xdp)
